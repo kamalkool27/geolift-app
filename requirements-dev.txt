@@ -1,0 +1,3 @@
+-r requirements.txt
+pymc-marketing>=0.15   # only for scripts/fit_mmm.py (refitting the MMM)
+pytest

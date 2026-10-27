@@ -1,9 +1,8 @@
+# App runtime (Streamlit Community Cloud installs this file)
 streamlit>=1.40
 pymc>=5.10
-pymc-marketing>=0.15
-scipy
 arviz
+scipy
 pandas
 numpy
 matplotlib
-pytest

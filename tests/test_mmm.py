@@ -68,6 +68,7 @@ def test_curves_and_unit_economics(res):
 
 @pytest.mark.slow
 def test_quick_fit_runs():
+    pytest.importorskip("pymc_marketing")  # refit-only dependency (requirements-dev.txt)
     df, truth = M.simulate(n_weeks=104)
     mmm, train, test = M.fit_mmm(df, M.lift_test_frame(df, truth), draws=50, tune=50, chains=1)
     post = M.extract(mmm, df, train, test)

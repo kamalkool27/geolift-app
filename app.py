@@ -27,6 +27,22 @@ tab_an, tab_plan, tab_mmm = st.tabs(["Analyse test", "Pre-test planner", "Media 
 with tab_mmm:
     render_mmm()
 
+with tab_plan:
+    st.subheader("Pre-test planner: how many cities and weeks do we need?")
+    st.caption("Simulates many 50/50 geo holdouts on log weekly customer spend to estimate power and minimum detectable effect.")
+    p = st.columns(4)
+    n_geos = p[0].slider("Cities", 6, 100, 40, 2)
+    pre = p[1].slider("Pre-period weeks", 4, 26, 8)
+    post = p[2].slider("Test weeks", 1, 12, 6)
+    lift = p[3].slider("Expected lift (%)", 1, 30, 6) / 100
+    noise = st.slider("City-week noise (log scale SD)", 0.02, 0.30, 0.05, 0.01)
+    res = simulate_power(n_geos, pre, post, lift, noise)
+    a, b = st.columns(2)
+    a.metric("Power (one-sided, 5%)", f"{res['power']:.0%}", "OK" if res["power"] >= 0.8 else "underpowered")
+    b.metric("MDE at 80% power", f"{res['mde_pct']:.1f}%")
+
+# Analyse tab is rendered LAST: its st.stop() calls end the script run,
+# so anything after it (e.g. the planner) would never render.
 with tab_an:
     with st.sidebar:
         st.header("1. Data")
@@ -125,17 +141,3 @@ with tab_an:
     for k in ["p_lift_gt_0", "actual_revenue", "spend", "rhat_max", "ess_min", "divergences"]:
         rows["metric"].append(k); rows["p3"].append(None); rows["median"].append(s[k]); rows["p97"].append(None)
     st.download_button("Download results CSV", pd.DataFrame(rows).to_csv(index=False), f"geolift_results_{segment or 'all'}.csv", "text/csv")
-
-with tab_plan:
-    st.subheader("Pre-test planner: how many cities and weeks do we need?")
-    st.caption("Simulates many 50/50 geo holdouts on log weekly customer spend to estimate power and minimum detectable effect.")
-    p = st.columns(4)
-    n_geos = p[0].slider("Cities", 6, 100, 40, 2)
-    pre = p[1].slider("Pre-period weeks", 4, 26, 8)
-    post = p[2].slider("Test weeks", 1, 12, 6)
-    lift = p[3].slider("Expected lift (%)", 1, 30, 6) / 100
-    noise = st.slider("City-week noise (log scale SD)", 0.02, 0.30, 0.05, 0.01)
-    res = simulate_power(n_geos, pre, post, lift, noise)
-    a, b = st.columns(2)
-    a.metric("Power (one-sided, 5%)", f"{res['power']:.0%}", "OK" if res["power"] >= 0.8 else "underpowered")
-    b.metric("MDE at 80% power", f"{res['mde_pct']:.1f}%")

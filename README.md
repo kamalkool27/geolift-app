@@ -1,24 +1,50 @@
-# GeoLift: Is Paid Media to Amazon Prime Members Incremental? (Bayesian, PyMC)
+# Measuring marketing incrementality: GeoLift + calibrated MMM (Bayesian, PyMC)
 
-> **Disclaimer: this is a practice / portfolio project.** All data is **simulated**. It is **not** real Amazon data, and it is **not** work done at or for Amazon. "Amazon India festive sale" is only a realistic framing for the case study.
+> **Simulated portfolio project by Kamaleshwaran K.** All data is **simulated**. It is **not** real Amazon (or Supabase) data and **not** work done at or for either company. Company names are only realistic framing for the case studies.
 
-## The business question
-**Is paid media to Prime members incremental, or are we paying for sales we'd get anyway?**
+**Live demo:** _coming soon (Streamlit Community Cloud link)_ · **2-min walkthrough:** _coming soon (Loom link)_
 
-Amazon India runs a **regional paid-media campaign** (search, social, display, OTT) ahead of its festive sale, targeted mainly to **Prime-member audiences** (hashed Prime lists via Customer Match / Custom Audiences / Amazon DSP). Ad platforms report strong ROAS, but Prime members are high-intent and shop heavily in the festive sale anyway, so platform ROAS over-credits ads most for exactly this group. **How much extra Prime-member spend (₹) did the campaign actually cause, and was it worth the ad spend?** A smaller non-Prime ad set runs alongside it for comparison.
+## TL;DR
+| | |
+|---|---|
+| **Problem** | Ad platforms report strong ROAS on festive paid media aimed at Prime members, but Prime members buy in the festive sale anyway. How much spend do the ads actually *cause*, and where should a ₹6.68 Cr/week budget go? |
+| **Approach** | (1) 40-city randomised **geo holdout**, Bayesian diff-in-diff in PyMC. (2) **Media mix model** (PyMC-Marketing, adstock + saturation + seasonality) **calibrated with the lift test**. (3) Budget optimiser on posterior draws. |
+| **Results** | Prime lift **+3.0%**, iROAS **1.07x**; non-Prime **+6.9%**, **2.43x**. MMM ROI: search **2.96x**, OTT **2.10x**, social **1.30x** (3.30x before calibration), display **0.54x**. Holdout MAPE **1.4%**. |
+| **Decision** | Shift ₹1.55 Cr/week from social + display into search + OTT (budget flat) → **≈ +₹2.4 Cr/week** incremental spend. Cap Prime-targeted spend pending a user-level holdout. |
+| **Biggest insight** | Without the experiment, the MMM over-credits social by **2.5x**. Calibrating models with experiments changes the budget decision. |
 
-**Design:** a geo holdout test. 40 Indian cities are paired by size and randomised, so 20 cities run the campaign (treated) and 20 don't (holdout). There are 8 pre-period weeks and 6 campaign weeks. The outcome is weekly **Prime-member customer spend (₹)** per city; the app's segment toggle switches to non-Prime spend.
+## Read these first
+| doc | what it is |
+|---|---|
+| [Decision memo](docs/decision-memo.md) | one-page exec memo: recommendation, evidence, ₹ budget shift, risks, next tests |
+| [Experimentation roadmap](docs/experimentation-roadmap.md) | 4-quarter channel test plan ranked by value of information ÷ cost, plus the MMM recalibration rule |
+| [Self-serve playbook](docs/self-serve-playbook.md) | how a marketer requests, runs and reads a lift test without analytics; guardrails and decision rules |
+| [Supabase-style PLG case](docs/supabase-case.md) | the same method applied to a developer product: does dev content drive paid upgrades or just sign-ups? (`scripts/supabase_sim.py`) |
 
-## What the app does
-A Streamlit app with two tabs:
-- **Analyse test:** choose the customer segment (**Prime** by default, or non-Prime), upload a city-week panel or use the bundled simulated sample. Pick the campaign start and end dates (and the treated cities if there's no `treated` column), then fit a Bayesian diff-in-diff model in PyMC. Outputs:
-  - Lift % in customer spend, with a 94% credible interval and P(lift > 0)
-  - **Incremental revenue (₹)** and **iROAS** (incremental revenue ÷ ad spend)
-  - Charts: treated-city actual spend vs the no-campaign counterfactual, and the posterior of lift
-  - A plain-English readout and decision
-  - Convergence diagnostics (r_hat, ESS, divergences)
-  - A downloadable results CSV
-- **Pre-test planner:** simulated power and minimum detectable effect (MDE) for a given number of cities, weeks and expected lift.
+## Architecture
+```mermaid
+flowchart LR
+  A[City-week panel CSV<br/>date, geo, y, segment, spend, treated] --> B[geolift/data.py<br/>validation]
+  B --> C[geolift/model.py<br/>Bayesian DiD in PyMC]
+  P[Pre-test planner<br/>power + MDE simulation] --> A
+  C --> D[Lift, iROAS, counterfactual]
+  D -- lift test as calibration --> E[scripts/fit_mmm.py<br/>PyMC-Marketing MMM<br/>adstock + saturation]
+  W[156 weeks national spend<br/>+ seasonality controls] --> E
+  E --> F[data/mmm_results.json<br/>pre-fitted posterior]
+  F --> G[geolift/mmm.py<br/>ROI, response curves, optimiser]
+  D --> H[Streamlit app.py<br/>3 tabs]
+  G --> H
+  H --> M[Decision memo + roadmap<br/>+ self-serve playbook]
+```
+
+## Deploy (Streamlit Community Cloud)
+The app runs on the bundled simulated data. The MMM loads from a pre-fitted JSON (no MCMC on the server); the GeoLift fit is a small PyMC model that samples in ~20–60 s and is cached.
+1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub.
+2. **Create app** → repo `kamalkool27/geolift-app`, branch `main`, main file `app.py`.
+3. Advanced settings → Python **3.11** or **3.12**. Deploy. `requirements.txt` holds only runtime deps; `pymc-marketing` is in `requirements-dev.txt` because it's only needed to refit.
+4. Paste the app URL into the "Live demo" line above.
+
+## GeoLift results (simulated)
 
 ![Actual vs counterfactual](docs/counterfactual.png)
 ![Lift posterior](docs/lift_posterior.png)
@@ -59,9 +85,9 @@ log(y[g,t]) = α_g + γ_t + τ · treated_g · post_t + ε, where ε ~ Normal(0,
 ```bash
 git clone https://github.com/kamalkool27/geolift-app.git && cd geolift-app
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # app + pytest + pymc-marketing (refit only)
 streamlit run app.py      # opens http://localhost:8501
-pytest -q                 # GeoLift + MMM tests (incl. a tiny MMM fit)
+pytest -q                 # GeoLift, MMM and Supabase-sim tests (MMM refit test skips without pymc-marketing)
 ```
 
 ## Media Mix Model tab (PyMC-Marketing, calibrated with the GeoLift test)
@@ -116,6 +142,8 @@ data/mmm_results.json     pre-fitted MMM posterior (regenerate with scripts/fit_
 data/sample_geo_panel.csv simulated festive-campaign panel (40 cities x 14 weeks x 2 segments)
 scripts/make_sample.py    regenerates the simulated sample
 scripts/fit_mmm.py        refits the MMM (calibrated + uncalibrated) and saves results
+scripts/supabase_sim.py   simulated PLG content-incrementality case (numpy only)
+docs/                     decision memo, roadmap, playbook, Supabase case, charts
 tests/                    pytest
 ```
 
