@@ -1,6 +1,6 @@
 # Measuring marketing incrementality: GeoLift + calibrated MMM (Bayesian, PyMC)
 
-> **Simulated portfolio project by Kamaleshwaran K.** All data is **simulated**. It is **not** real Amazon (or Supabase) data and **not** work done at or for either company. Company names are only realistic framing for the case studies.
+> **Simulated portfolio project by Kamaleshwaran K.** All data is **simulated**. It is **not** real Amazon data and **not** work done at or for Amazon. Company names are only realistic framing for the case studies.
 
 **Live demo:** _coming soon (Streamlit Community Cloud link)_ · **2-min walkthrough:** _coming soon (Loom link)_
 
@@ -19,7 +19,7 @@
 | [Decision memo](docs/decision-memo.md) | one-page exec memo: recommendation, evidence, ₹ budget shift, risks, next tests |
 | [Experimentation roadmap](docs/experimentation-roadmap.md) | 4-quarter channel test plan ranked by value of information ÷ cost, plus the MMM recalibration rule |
 | [Self-serve playbook](docs/self-serve-playbook.md) | how a marketer requests, runs and reads a lift test without analytics; guardrails and decision rules |
-| [Supabase-style PLG case](docs/supabase-case.md) | the same method applied to a developer product: does dev content drive paid upgrades or just sign-ups? (`scripts/supabase_sim.py`) |
+| [Prime subscription study](docs/prime-subscription-study.md) | does a festive Prime free-trial promo create paid, retained members or just trials? Results + action taken (`scripts/prime_sub_sim.py`) |
 
 ## Architecture
 ```mermaid
@@ -87,7 +87,7 @@ git clone https://github.com/kamalkool27/geolift-app.git && cd geolift-app
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt   # app + pytest + pymc-marketing (refit only)
 streamlit run app.py      # opens http://localhost:8501
-pytest -q                 # GeoLift, MMM and Supabase-sim tests (MMM refit test skips without pymc-marketing)
+pytest -q                 # GeoLift, MMM and Prime-subscription-sim tests (MMM refit test skips without pymc-marketing)
 ```
 
 ## Media Mix Model tab (PyMC-Marketing, calibrated with the GeoLift test)
@@ -142,8 +142,8 @@ data/mmm_results.json     pre-fitted MMM posterior (regenerate with scripts/fit_
 data/sample_geo_panel.csv simulated festive-campaign panel (40 cities x 14 weeks x 2 segments)
 scripts/make_sample.py    regenerates the simulated sample
 scripts/fit_mmm.py        refits the MMM (calibrated + uncalibrated) and saves results
-scripts/supabase_sim.py   simulated PLG content-incrementality case (numpy only)
-docs/                     decision memo, roadmap, playbook, Supabase case, charts
+scripts/prime_sub_sim.py  simulated Prime subscription geo test (numpy only)
+docs/                     decision memo, roadmap, playbook, Prime subscription study, charts
 tests/                    pytest
 ```
 

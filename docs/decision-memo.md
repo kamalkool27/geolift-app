@@ -37,3 +37,6 @@ Moves are capped at ±50% per flight because the response curves outside the obs
 3. Display go-dark in 10 cities — confirms the 0.54x before cutting further.
 
 **Ask:** approve the reallocation for the next flight, plus ₹0.3 Cr/week of test budget for tests 1–3.
+
+## Related: Prime subscription study (simulated)
+The festive Prime trial promo lifted trials +21% but day-90 paid members only +3.1% (LTV iROAS ~0.88x); budget cut ₹4.8 Cr to ₹2.0 Cr. See [prime-subscription-study.md](prime-subscription-study.md).

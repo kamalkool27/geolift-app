@@ -31,3 +31,5 @@ Refit and recalibrate (`scripts/fit_mmm.py` with the new `add_lift_test_measurem
 4. **Calendar default:** quarterly refit; full recalibration with all lift tests before each festive budget lock.
 
 If a lift test agrees with the MMM (inside the interval), add it as calibration data anyway; it narrows the interval at no cost.
+
+- **Next festive window:** 7-day vs 30-day Prime trial geo test, read on day-90 paid members ([study](prime-subscription-study.md)).
