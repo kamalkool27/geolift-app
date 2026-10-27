@@ -1,5 +1,7 @@
 streamlit>=1.40
 pymc>=5.10
+pymc-marketing>=0.15
+scipy
 arviz
 pandas
 numpy

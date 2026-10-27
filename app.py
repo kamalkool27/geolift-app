@@ -4,6 +4,7 @@ import streamlit as st
 
 from geolift.data import ValidationError, load_sample, segments, validate
 from geolift.model import fit, simulate_power
+from geolift.mmm_tab import render as render_mmm
 from geolift.plots import counterfactual_chart, lift_posterior_chart
 
 st.set_page_config(page_title="Amazon India Festive Campaign GeoLift (practice)", layout="wide")
@@ -21,7 +22,10 @@ def run_model(panel: pd.DataFrame, draws: int):
     return r
 
 
-tab_an, tab_plan = st.tabs(["Analyse test", "Pre-test planner"])
+tab_an, tab_plan, tab_mmm = st.tabs(["Analyse test", "Pre-test planner", "Media Mix Model"])
+
+with tab_mmm:
+    render_mmm()
 
 with tab_an:
     with st.sidebar:
