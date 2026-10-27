@@ -2,16 +2,17 @@
 import pandas as pd
 import streamlit as st
 
-from geolift.data import ValidationError, load_sample, validate
+from geolift.data import ValidationError, load_sample, segments, validate
 from geolift.model import fit, simulate_power
 from geolift.plots import counterfactual_chart, lift_posterior_chart
 
 st.set_page_config(page_title="Amazon India Festive Campaign GeoLift (practice)", layout="wide")
-st.title("Amazon India festive sale: does the regional paid-media campaign drive incremental customer spend?")
+st.title("Is paid media to Prime members incremental, or are we paying for sales we'd get anyway?")
 st.warning("**Practice / portfolio project.** All data is SIMULATED. This is not real Amazon data, "
            "and not work done at or for Amazon.")
 st.caption("Bayesian geo-holdout (diff-in-diff) analysis in PyMC. Treated cities ran the festive-sale paid-media "
-           "campaign (search, social, display, OTT) during the test; holdout cities did not. Outcome = weekly customer spend (INR).")
+           "campaign (search, social, display, OTT), targeted to Prime-member audiences, during the test; holdout cities did not. "
+           "Outcome = weekly Prime-member customer spend (INR) per city. Toggle to non-Prime to compare.")
 
 
 @st.cache_data(show_spinner=False)
@@ -27,7 +28,7 @@ with tab_an:
         st.header("1. Data")
         src = st.radio("Source", ["Sample: simulated Amazon India festive-sale panel (40 cities)", "Upload CSV"])
         if src.startswith("Upload"):
-            f = st.file_uploader("CSV with columns date, geo, y [, spend, treated]", type="csv")
+            f = st.file_uploader("CSV with columns date, geo, y [, segment, spend, treated]", type="csv")
             raw = pd.read_csv(f) if f else None
         else:
             raw = load_sample()
@@ -44,13 +45,19 @@ with tab_an:
         default_start = dates[8] if len(dates) > 8 else dates[-1]
         start = st.selectbox("Campaign start (ads ON in treated cities)", dates, index=dates.index(default_start))
         end = st.selectbox("Campaign end", dates, index=len(dates) - 1)
+        segs = segments(raw)
+        segment = None
+        if segs:
+            labels = {"prime": "Prime members", "non_prime": "Non-Prime customers"}
+            default = segs.index("prime") if "prime" in segs else 0
+            segment = st.radio("Customer segment", segs, index=default, format_func=lambda x: labels.get(x, x), horizontal=True)
         treated_geos = None
         if "treated" not in raw.columns:
             treated_geos = st.multiselect("Treated cities (ads ON)", sorted(raw["geo"].astype(str).unique()))
         spend_override = st.number_input("Total campaign ad spend override (INR, 0 = use 'spend' column)", 0, 10**10, 0, 100000)
         draws = st.select_slider("Posterior draws per chain", [300, 500, 1000], 500)
     try:
-        panel = validate(raw, start, end, treated_geos)
+        panel = validate(raw, start, end, treated_geos, segment)
     except ValidationError as e:
         st.error(f"Data problem: {e}"); st.stop()
 
@@ -80,7 +87,9 @@ with tab_an:
 
     st.pyplot(counterfactual_chart(r.weekly)); st.pyplot(lift_posterior_chart(r.lift))
 
-    st.subheader("Readout")
+    seg_name = {"prime": "Prime-member", "non_prime": "non-Prime"}.get(segment, "customer") if segment else "customer"
+    st.subheader("Readout: is paid media to " + ("Prime members" if segment == "prime" else f"{seg_name} customers")
+                 + " incremental, or are we paying for sales we'd get anyway?")
     if s["p_lift_gt_0"] < 0.9:
         verdict = ("**No reliable evidence** that the festive campaign drove extra customer spend. "
                    "Re-test with more cities/weeks before scaling the regional budget.")
@@ -89,12 +98,16 @@ with tab_an:
                    f"{s['iroas'][1]:.2f} INR of incremental revenue (below breakeven before margin). **Cut or reallocate** spend, "
                    "and don't trust platform-reported ROAS, which credits festive purchases that would have happened anyway.")
     else:
-        verdict = f"The campaign drives a credible ~{med:.1f}% lift with iROAS {s.get('iroas', [0, float('nan')])[1]:.2f}x. Compare iROAS to your margin-adjusted breakeven (e.g. 1 / contribution margin) before scaling."
-    st.markdown(f"In the treated cities, customer spend was **{med:.1f}%** higher than it would have been without ads "
+        verdict = f"Paid media to this segment drives a credible ~{med:.1f}% lift with iROAS {s.get('iroas', [0, float('nan')])[1]:.2f}x. Compare iROAS to your margin-adjusted breakeven (e.g. 1 / contribution margin) before scaling."
+    st.markdown(f"In the treated cities, {seg_name} spend was **{med:.1f}%** higher than it would have been without ads "
                 f"(94% credible interval {lo:.1f}% to {hi:.1f}%; {s['p_lift_gt_0']:.0%} probability the effect is positive). "
                 f"That is about **INR {s['incremental_revenue'][1]/1e7:.2f} Cr** of incremental revenue out of "
                 f"INR {s['actual_revenue']/1e7:.2f} Cr actual, on INR {r.spend/1e7:.2f} Cr of ad spend. {verdict}")
 
+    if segment == "prime":
+        st.info("Prime members are high-intent and buy heavily in the festive sale anyway, so expect a small lift here; "
+                "platform-reported ROAS over-credits ads most for this group. Toggle **Non-Prime customers** to compare. "
+                "Next step: validate with a user-level randomised holdout (Customer Match / Amazon DSP audiences).")
     st.subheader("Convergence diagnostics")
     d = st.columns(3)
     d[0].metric("r_hat (tau)", f"{s['rhat_max']:.3f}", "OK" if s["rhat_max"] < 1.01 else "check")
@@ -107,7 +120,7 @@ with tab_an:
             rows["metric"].append(k); rows["p3"].append(s[k][0]); rows["median"].append(s[k][1]); rows["p97"].append(s[k][2])
     for k in ["p_lift_gt_0", "actual_revenue", "spend", "rhat_max", "ess_min", "divergences"]:
         rows["metric"].append(k); rows["p3"].append(None); rows["median"].append(s[k]); rows["p97"].append(None)
-    st.download_button("Download results CSV", pd.DataFrame(rows).to_csv(index=False), "geolift_results.csv", "text/csv")
+    st.download_button("Download results CSV", pd.DataFrame(rows).to_csv(index=False), f"geolift_results_{segment or 'all'}.csv", "text/csv")
 
 with tab_plan:
     st.subheader("Pre-test planner: how many cities and weeks do we need?")

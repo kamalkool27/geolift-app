@@ -1,4 +1,4 @@
-"""Loading and validating the geo panel (long format: date, geo, y, [spend], [treated])."""
+"""Loading and validating the geo panel (long format: date, geo, y, [segment], [spend], [treated])."""
 from pathlib import Path
 import pandas as pd
 
@@ -16,10 +16,32 @@ def load_sample() -> pd.DataFrame:
     return pd.read_csv(SAMPLE_PATH)
 
 
-def validate(df: pd.DataFrame, test_start, test_end, treated_geos=None) -> pd.DataFrame:
-    """Return a clean panel with columns date, geo, y, spend, treated, post. Raises ValidationError."""
+def segments(df: pd.DataFrame) -> list:
+    """Customer segments present in the optional 'segment' column (e.g. prime / non_prime)."""
+    cols = {c.strip().lower(): c for c in df.columns}
+    if "segment" not in cols:
+        return []
+    return sorted(df[cols["segment"]].dropna().astype(str).str.strip().str.lower().unique())
+
+
+def validate(df: pd.DataFrame, test_start, test_end, treated_geos=None, segment=None) -> pd.DataFrame:
+    """Return a clean panel with columns date, geo, y, spend, treated, post. Raises ValidationError.
+
+    If the data has a 'segment' column (e.g. prime / non_prime), pass segment= to analyse one segment.
+    """
     df = df.copy()
     df.columns = [c.strip().lower() for c in df.columns]
+    if "segment" in df.columns:
+        df["segment"] = df["segment"].astype(str).str.strip().str.lower()
+        if segment is None:
+            if df["segment"].nunique() > 1:
+                raise ValidationError(f"Data has several segments ({', '.join(sorted(df['segment'].unique()))}); choose one to analyse.")
+        else:
+            if str(segment).lower() not in set(df["segment"]):
+                raise ValidationError(f"Segment '{segment}' not found in the 'segment' column.")
+            df = df[df["segment"] == str(segment).lower()]
+    elif segment is not None:
+        raise ValidationError("A segment was selected but the data has no 'segment' column.")
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         raise ValidationError(f"Missing required column(s): {', '.join(missing)}. Expected: date, geo, y (+ optional spend, treated).")
@@ -34,7 +56,7 @@ def validate(df: pd.DataFrame, test_start, test_end, treated_geos=None) -> pd.Da
         raise ValidationError("Column 'y' must be > 0 for every geo-period (the model works on log revenue).")
     df["geo"] = df["geo"].astype(str)
     if df.duplicated(["date", "geo"]).any():
-        raise ValidationError("Duplicate (date, geo) rows found - one row per geo per period expected.")
+        raise ValidationError("Duplicate (date, geo) rows found - one row per geo per period (per segment) expected.")
     n_dates = df["date"].nunique()
     counts = df.groupby("geo")["date"].nunique()
     if (counts != n_dates).any():
